@@ -7,19 +7,19 @@ Created on Mon May 20 18:05:38 2019
 import numpy as np
 import pygame
 
-np.random.seed()
+np.random.seed()                        #if you wish you can set up a seed for numpy - this will result in creating same maze every time
 
 class Environment(object):
     
     def __init__(self):
-        self.width = 900
-        self.height = 900
-        self.nRows = 40
-        self.nColumns = 40
-        self.wallRatio = 0.3
-        self.gamma = 0.9
-        self.learningRate = 0.01
-        self.boxSize = 3
+        self.width = 900                #width of maze window
+        self.height = 900               #height of maze window
+        self.nRows = 40                 #number of rows in maze
+        self.nColumns = 40              #number of columns in maze
+        self.wallRatio = 0.3            #approximation of wall to all cells ratio, works the best with values in range (0.3, 0.35)
+        self.gamma = 0.9                #Q values decrement, part of q learning
+        self.learningRate = 0.01        #coefficient that decides how much we want our new Q value affect the old one
+        self.boxSize = 3                #box size for start and finish, makes sure bot does not spawn in wall and lowers chances of there being no exit
         
         
         self.maze = np.zeros((self.nRows, self.nColumns))
@@ -157,7 +157,6 @@ class Environment(object):
                         y -= 1
             
             pygame.draw.rect(self.screen, (255, 0, 0), (cellWidth*x, cellHeight*y, cellWidth, cellHeight))
-            #pygame.time.wait(1)
             pygame.display.flip()
                 
     
@@ -182,8 +181,7 @@ while True:
         print('Closest above 0 cell distance: {:.4f}'.format(dist) + ' Epoch: ' + str(int(iteration / 1000)))
         if dist <= 1:
             env.play()
-    if env.qTable[0][0] > 1.:
-        break
+    
         
         
         

@@ -14,4 +14,4 @@ My specs:
 
 Training: In order to increase performance, initially bot will not perform any moves, therefore current path will not be displayed. Actually, at the beginning bot does not have any route to follow, as it starts searching for the path from the end. You can see in the console however how far a bot is from solving the maze. It shows which closest cell has got a q-value of over zero, which means that a path has been found from this point to the very end of a maze. Once the distance equals 1, bot will start moving, meaning it found the path. There is no guarantee that first path will be the shortest one, but after time it should find the most optimal route. 
 
-This way of solving a maze is quicker than genetic algoritm, especially after some certain performance upgrades.
+This way of solving a maze is quicker than genetic algorithm, especially after some certain performance upgrades.

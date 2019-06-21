@@ -7,24 +7,24 @@ Created on Mon May 20 18:05:38 2019
 import numpy as np
 import pygame
 
-np.random.seed()                        #if you wish you can set up a seed for numpy - this will result in creating same maze every time
+np.random.seed()
 
 class Environment(object):
     
     def __init__(self):
-        self.width = 900                #width of maze window
-        self.height = 900               #height of maze window
-        self.nRows = 40                 #number of rows in maze
-        self.nColumns = 40              #number of columns in maze
-        self.wallRatio = 0.3            #approximation of wall to all cells ratio, works the best with values in range (0.3, 0.35)
-        self.gamma = 0.9                #Q values decrement, part of q learning
-        self.learningRate = 0.01        #coefficient that decides how much we want our new Q value affect the old one
-        self.boxSize = 3                #box size for start and finish, makes sure bot does not spawn in wall and lowers chances of there being no exit
-        
+        self.width = 900
+        self.height = 900
+        self.nRows = 100
+        self.nColumns = 100
+        self.wallRatio = 0.3
+        self.gamma = 0.9
+        self.alpha = 0.9
+        self.boxSize = 3
+        self.moveReward = 0.0001
         
         self.maze = np.zeros((self.nRows, self.nColumns))
         self.qTable = np.zeros((self.nRows, self.nColumns))
-        self.rewards = np.zeros((self.nRows, self.nColumns))
+        self.rewards = np.zeros((self.nRows*self.nColumns, self.nRows*self.nColumns))
         self.screen = pygame.display.set_mode((self.width, self.height))
         
         
@@ -34,20 +34,60 @@ class Environment(object):
                 if np.random.rand() < self.wallRatio:
                     self.maze[i][j] = 1
         
+        
+        
         for i in range(min(self.boxSize, self.nRows)):
             for j in range(min(self.boxSize, self.nColumns)):
                 self.maze[i][j] = 0
                 self.maze[self.nRows - i - 1][self.nColumns - j - 1] = 0
-
+        
+        
+        for i in range(self.nRows*self.nColumns):
+            row = int(i / self.nColumns)
+            column = i % self.nColumns
+            if self.maze[row][column] != 1:
+                if column > 0:
+                    if self.maze[row][column - 1] != 1:
+                        self.rewards[i][row*self.nColumns + column - 1] = self.moveReward
+                    else:
+                        self.rewards[i][i] = self.moveReward
+                else:
+                        self.rewards[i][i] = self.moveReward
+                        
+                if column < self.nColumns - 1:
+                    if self.maze[row][column + 1] != 1:
+                        self.rewards[i][row*self.nColumns + column + 1] = self.moveReward
+                    else:
+                        self.rewards[i][i] = self.moveReward
+                else:
+                        self.rewards[i][i] = self.moveReward
+                        
+                if row > 0:
+                    if self.maze[row - 1][column] != 1:
+                        self.rewards[i][(row - 1)*self.nColumns + column] = self.moveReward
+                    else:
+                        self.rewards[i][i] = self.moveReward
+                else:
+                        self.rewards[i][i] = self.moveReward     
                 
+                if row < self.nRows - 1:
+                    if self.maze[row + 1][column] != 1:
+                        self.rewards[i][(row + 1)*self.nColumns + column] = self.moveReward
+                    else:
+                        self.rewards[i][i] = self.moveReward
+                else:
+                        self.rewards[i][i] = self.moveReward
+            
         
-        self.rewards[self.nRows - 1][self.nColumns - 1] = 1000
-        self.qTable[self.nRows - 1][self.nColumns - 1] = 10
-        
+        self.qTable = self.rewards.copy()
+        self.rewards[self.nRows*self.nColumns - 1][self.nColumns*self.nRows - 1] = 1000
+        self.posx = 0
+        self.posy = 0
         self.drawMaze()
-        pygame.display.flip()
+        
         
     def drawMaze(self):
+        self.screen.fill((0,0,0))
         cellWidth = self.width/self.nColumns
         cellHeight = self.height/self.nRows
         
@@ -55,138 +95,55 @@ class Environment(object):
             for j in range(self.nColumns):
                 if self.maze[i][j] == 1:
                     pygame.draw.rect(self.screen, (255,255,255), (cellWidth*j, cellHeight*i, cellWidth, cellHeight))
-        
-     
-    def calcNewQValue(self, reward, qcs, qns):
-        qcs += self.learningRate*(reward + self.gamma*qns)
-        return qcs
-        
-    def step(self):
-        x = np.random.randint(0, self.nColumns)
-        y = np.random.randint(0, self.nRows)
-        
-        maxValue = 0
-        while maxValue == 0 or self.maze[y][x] == 1:
-            x = np.random.randint(0, self.nColumns)
-            y = np.random.randint(0, self.nRows)
-            qValues = np.zeros((4))
-            if x < self.nColumns - 1:
-                qValues[0] = self.qTable[y][x + 1]
-            if x > 0:
-                qValues[1] = self.qTable[y][x - 1]
-            if y < self.nRows - 1:
-                qValues[2] = self.qTable[y + 1][x]
-            if y > 0:
-                qValues[3] = self.qTable[y - 1][x]
-            
-            maxValue = np.max(qValues)
-        
-        action = np.random.randint(0,4)
-        if action == 0: #RIGHT
-            if x < self.nColumns-1:
-                if self.maze[y][x + 1] == 1:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-                else:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x + 1], self.qTable[y][x], self.qTable[y][x + 1])
-            else:
-                self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-        elif action == 1: #LEFT
-            if x > 0:
-                if self.maze[y][x - 1] == 1:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-                else:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x - 1], self.qTable[y][x], self.qTable[y][x - 1])
-            else:
-                self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-        elif action == 2: #DOWN
-            if y < self.nRows - 1:
-                if self.maze[y + 1][x] == 1:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-                else:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y + 1][x], self.qTable[y][x], self.qTable[y + 1][x])
-            else:
-                self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-        elif action == 3: #UP
-            if y > 0:
-                if self.maze[y - 1][x] == 1:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-                else:
-                    self.qTable[y][x] = self.calcNewQValue(self.rewards[y - 1][x], self.qTable[y][x], self.qTable[y - 1][x])
-            else:
-                self.qTable[y][x] = self.calcNewQValue(self.rewards[y][x], self.qTable[y][x], self.qTable[y][x])
-        
+                    
+        pygame.draw.rect(self.screen, (255, 0, 0), (cellWidth*self.posx, cellHeight*self.posy, cellWidth, cellHeight))
         pygame.display.flip()
+    
+    def step(self):
+        pos = np.random.randint(0, self.nColumns*self.nRows)
+        row = int(pos / self.nColumns)
+        column = pos % self.nColumns
+        while self.maze[row][column] == 1:
+            pos = np.random.randint(0, self.nColumns*self.nRows)
+            row = int(pos / self.nColumns)
+            column = pos % self.nColumns
+        
+        actions = list()
+        for i in range(self.nColumns*self.nRows):
+            if self.rewards[pos][i] != 0:
+                actions.append(i)
+        
+        action = np.random.choice(actions)
+        
+        TD = self.rewards[pos][action] + self.gamma * self.qTable[action, np.argmax(self.qTable[action])] - self.qTable[pos][action]
+        self.qTable[pos][action] += self.alpha * TD
         
     def play(self):
-        cellWidth = self.width/self.nColumns
-        cellHeight = self.height/self.nRows
-        x = 0
-        y = 0
-        move = 0
-        while move < int(pow(pow(self.nColumns, 2) + pow(self.nRows, 2), 0.5)*2):
-            self.screen.fill((0,0,0))
+        self.posx = 0
+        self.posy = 0
+        for i in range(int(2 * pow(pow(self.nRows, 2) + pow(self.nColumns, 2), 0.5))):
+            action = np.argmax(self.qTable[self.posy*self.nRows + self.posx])
+            self.posx = action % self.nRows
+            self.posy = int(action / self.nRows)
             self.drawMaze()
             
-            move += 1
-            qValues = np.zeros((4))
-            if x < self.nColumns - 1:
-                qValues[0] = self.qTable[y][x + 1]
-            if x > 0:
-                qValues[1] = self.qTable[y][x - 1]
-            if y < self.nRows - 1:
-                qValues[2] = self.qTable[y + 1][x]
-            if y > 0:
-                qValues[3] = self.qTable[y - 1][x]
-                
-            action = np.argmax(qValues)
-            if action == 0:
-                if x < self.nColumns - 1:
-                    if self.maze[y][x + 1] != 1:
-                        x += 1
-            elif action == 1:
-                if x > 0:
-                    if self.maze[y][x - 1] != 1:
-                        x -= 1
-            elif action == 2:
-                if y < self.nColumns - 1:
-                    if self.maze[y + 1][x] != 1:
-                        y += 1
-            elif action == 3:
-                if y > 0:
-                    if self.maze[y - 1][x] != 1:
-                        y -= 1
-            
-            pygame.draw.rect(self.screen, (255, 0, 0), (cellWidth*x, cellHeight*y, cellWidth, cellHeight))
-            pygame.display.flip()
-                
+            if self.posx == self.nColumns - 1 and self.posy == self.nRows - 1:
+                break
+                   
     
 env = Environment()
-iteration = 0
-table = list()
+t = env.rewards 
+i = 0
 while True:
+    i += 1
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            quit()
-    iteration += 1 
-    env.step()   
-    if iteration % 1000 == 0:
-        table = env.qTable
-        dist = pow(pow(env.nColumns,2) + pow(env.nRows,2), 0.5)
-        for i in range(env.nRows):
-            for j in range(env.nColumns):
-                if env.qTable[i][j] > 0:
-                    d = pow(pow(i, 2) + pow(j, 2), 0.5)
-                    if d < dist:
-                        dist = d
-        print('Closest above 0 cell distance: {:.4f}'.format(dist) + ' Epoch: ' + str(int(iteration / 1000)))
-        if dist <= 1:
-            env.play()
-    
-        
-        
-        
-        
-        
-        
+            if event.type == pygame.QUIT:
+                quit()
+    env.step()
+    if i % 30000 == 0:
+        print('Showing the results')
+        env.play()
+    Q = env.qTable
+          
         
         
